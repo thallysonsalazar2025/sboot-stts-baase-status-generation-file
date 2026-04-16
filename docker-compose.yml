@@ -1,0 +1,164 @@
+version: '3.9'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis:7.2-alpine
+    hostname: redis
+    ports:
+      - "6379:6379"
+
+  payroll-generation-request-publisher:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: publisher
+      SERVICE_NAME: payroll-generation-request-publisher
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      OUT_QUEUE: payroll.generation.request
+      CORRELATION_ID: e2e-correlation-001
+    depends_on:
+      - rabbitmq
+
+  boot-payroll-orchestrator-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: boot-payroll-orchestrator-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.generation.request
+      OUT_QUEUE: payroll.validation.request
+    depends_on:
+      - rabbitmq
+
+  sboot-payroll-validation-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-payroll-validation-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.validation.request
+      OUT_QUEUE: payroll.events.request
+    depends_on:
+      - rabbitmq
+
+  sboot-payroll-events-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-payroll-events-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.events.request
+      OUT_QUEUE: payroll.time-tracking.request
+    depends_on:
+      - rabbitmq
+
+  sboot-time-tracking-integration-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-time-tracking-integration-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.time-tracking.request
+      OUT_QUEUE: payroll.calculation.request
+    depends_on:
+      - rabbitmq
+
+  sboot-payroll-calculation-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-payroll-calculation-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.calculation.request
+      OUT_QUEUE: payroll.generation.processor.request
+    depends_on:
+      - rabbitmq
+
+  sboot-payroll-generation-processor:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-payroll-generation-processor
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.generation.processor.request
+      OUT_QUEUE: payroll.generation.result
+    depends_on:
+      - rabbitmq
+
+  sboot-stts-base-status-generation-file:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: status
+      SERVICE_NAME: sboot-stts-base-status-generation-file
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.generation.result
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_TIMEOUT: 2s
+    ports:
+      - "8080:8080"
+    depends_on:
+      - rabbitmq
+      - redis
+
+  sboot-security-base-api-gateway:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-security-base-api-gateway
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: gateway.auth.request
+      OUT_QUEUE: security.auth.request
+    depends_on:
+      - rabbitmq
+
+  sboot-security-base-auth-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-security-base-auth-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: security.auth.request
+      OUT_QUEUE: payroll.query.request
+    depends_on:
+      - rabbitmq
+
+  sboot-payroll-query-service:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-payroll-query-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: payroll.query.request
+      OUT_QUEUE: data.employee.request
+    depends_on:
+      - rabbitmq
+
+  sboot-data-employe-serice:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-data-employe-serice
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: data.employee.request
+      OUT_QUEUE: data.company.request
+    depends_on:
+      - rabbitmq
+
+  sboot-data-company-serice:
+    build: ./services/common
+    environment:
+      SERVICE_MODE: relay
+      SERVICE_NAME: sboot-data-company-serice
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      IN_QUEUE: data.company.request
+      OUT_QUEUE: gateway.response
+    depends_on:
+      - rabbitmq
