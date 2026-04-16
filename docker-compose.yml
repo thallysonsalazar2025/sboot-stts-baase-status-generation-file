@@ -39,6 +39,8 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      PAYROLL_QUEUE_INPUT: ""
+      PAYROLL_QUEUE_OUTPUT: payroll.generation.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -46,7 +48,10 @@ services:
   boot-payroll-orchestrator-service:
     image: ${BOOT_PAYROLL_ORCHESTRATOR_IMAGE:-boot-payroll-orchestrator-service:latest}
     container_name: boot-payroll-orchestrator-service
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.generation.request
+      PAYROLL_QUEUE_OUTPUT: payroll.validation.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -54,6 +59,10 @@ services:
   sboot-payroll-validation-service:
     image: ${SBOOT_PAYROLL_VALIDATION_IMAGE:-sboot-payroll-validation-service:latest}
     container_name: sboot-payroll-validation-service
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.validation.request
+      PAYROLL_QUEUE_OUTPUT: payroll.events.request
     environment: *java_common_env
     depends_on:
       rabbitmq:
@@ -62,6 +71,10 @@ services:
   sboot-payroll-events-service:
     image: ${SBOOT_PAYROLL_EVENTS_IMAGE:-sboot-payroll-events-service:latest}
     container_name: sboot-payroll-events-service
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.events.request
+      PAYROLL_QUEUE_OUTPUT: payroll.time-tracking.request
     environment: *java_common_env
     depends_on:
       rabbitmq:
@@ -70,7 +83,10 @@ services:
   sboot-time-tracking-integration-service:
     image: ${SBOOT_TIME_TRACKING_INTEGRATION_IMAGE:-sboot-time-tracking-integration-service:latest}
     container_name: sboot-time-tracking-integration-service
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.time-tracking.request
+      PAYROLL_QUEUE_OUTPUT: payroll.calculation.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -78,7 +94,10 @@ services:
   sboot-payroll-calculation-service:
     image: ${SBOOT_PAYROLL_CALCULATION_IMAGE:-sboot-payroll-calculation-service:latest}
     container_name: sboot-payroll-calculation-service
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.calculation.request
+      PAYROLL_QUEUE_OUTPUT: payroll.generation.processor.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -86,7 +105,10 @@ services:
   sboot-payroll-generation-processor:
     image: ${SBOOT_PAYROLL_GENERATION_PROCESSOR_IMAGE:-sboot-payroll-generation-processor:latest}
     container_name: sboot-payroll-generation-processor
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.generation.processor.request
+      PAYROLL_QUEUE_OUTPUT: payroll.generation.result
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -102,6 +124,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2s}
+      PAYROLL_QUEUE_INPUT: payroll.generation.result
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -113,7 +136,10 @@ services:
     container_name: sboot-security-base-api-gateway
     ports:
       - "9000:9000"
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: gateway.auth.request
+      PAYROLL_QUEUE_OUTPUT: security.auth.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -121,7 +147,10 @@ services:
   sboot-security-base-auth-service:
     image: ${SBOOT_SECURITY_AUTH_IMAGE:-sboot-security-base-auth-service:latest}
     container_name: sboot-security-base-auth-service
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: security.auth.request
+      PAYROLL_QUEUE_OUTPUT: payroll.query.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -129,7 +158,10 @@ services:
   sboot-payroll-query-service:
     image: ${SBOOT_PAYROLL_QUERY_IMAGE:-sboot-payroll-query-service:latest}
     container_name: sboot-payroll-query-service
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: payroll.query.request
+      PAYROLL_QUEUE_OUTPUT: data.employee.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -137,7 +169,10 @@ services:
   sboot-data-employe-serice:
     image: ${SBOOT_DATA_EMPLOYE_IMAGE:-sboot-data-employe-serice:latest}
     container_name: sboot-data-employe-serice
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: data.employee.request
+      PAYROLL_QUEUE_OUTPUT: data.company.request
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -145,7 +180,10 @@ services:
   sboot-data-company-serice:
     image: ${SBOOT_DATA_COMPANY_IMAGE:-sboot-data-company-serice:latest}
     container_name: sboot-data-company-serice
-    environment: *java_common_env
+    environment:
+      <<: *java_common_env
+      PAYROLL_QUEUE_INPUT: data.company.request
+      PAYROLL_QUEUE_OUTPUT: gateway.response
     depends_on:
       rabbitmq:
         condition: service_healthy

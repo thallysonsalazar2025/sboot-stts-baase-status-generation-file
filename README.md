@@ -9,6 +9,7 @@ Você está certo em se preocupar: o ambiente agora foi ajustado para **manter a
 - Redis para persistência de status.
 - Serviço de status consumindo `payroll.generation.result` e notificando frontend via SSE.
 - Script de validação E2E sem trocar a stack dos microserviços (continua Spring Boot).
+- Mapeamento explícito de fila de entrada/saída por serviço (`PAYROLL_QUEUE_INPUT`/`PAYROLL_QUEUE_OUTPUT`) para deixar claro o encadeamento entre componentes no ambiente.
 
 ## Componentes no Compose
 
@@ -41,6 +42,11 @@ Você está certo em se preocupar: o ambiente agora foi ajustado para **manter a
 7. `sboot-payroll-generation-processor` publica em `payroll.generation.result`.
 8. `sboot-stts-base-status-generation-file` consome resultado, grava no Redis e expõe SSE.
 
+## Sobre os apontamentos do PR anterior (Python/uvicorn)
+
+Os pontos reportados sobre `asyncio.run(main())`, `uvicorn.run()` e inicialização de `app.state.redis_client` eram válidos no mock Python anterior.  
+Nesta revisão, o ambiente foi consolidado para **Java/Spring Boot**, então esses riscos específicos não existem mais neste repositório.
+
 ## Configuração Redis usada no status service
 
 ```yaml
@@ -55,6 +61,7 @@ redis:
 
 - Docker + Docker Compose
 - Imagens Docker dos microserviços Spring Boot já construídas/publicadas
+- (Opcional) copie `.env.example` para `.env` e ajuste os nomes das imagens
 
 ## Subir ambiente
 
