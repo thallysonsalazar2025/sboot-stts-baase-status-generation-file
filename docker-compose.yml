@@ -63,6 +63,7 @@ services:
       <<: *java_common_env
       PAYROLL_QUEUE_INPUT: payroll.validation.request
       PAYROLL_QUEUE_OUTPUT: payroll.events.request
+    environment: *java_common_env
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -74,6 +75,7 @@ services:
       <<: *java_common_env
       PAYROLL_QUEUE_INPUT: payroll.events.request
       PAYROLL_QUEUE_OUTPUT: payroll.time-tracking.request
+    environment: *java_common_env
     depends_on:
       rabbitmq:
         condition: service_healthy
