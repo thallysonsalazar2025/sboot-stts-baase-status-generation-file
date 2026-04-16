@@ -1,42 +1,47 @@
-# Ambiente E2E — Status de Processamento da Folha
+# Ambiente E2E (Java/Spring Boot) — Status de Processamento
 
-Este repositório cria um ambiente de integração com os componentes solicitados para validar o fluxo fim a fim de geração de folha, com foco no microserviço de **Status de Processamento**.
+Você está certo em se preocupar: o ambiente agora foi ajustado para **manter arquitetura Java/Spring Boot** nos serviços.
 
-## Componentes incluídos
+## O que este repositório entrega
 
-- sboot-payroll-query-service
-- boot-payroll-orchestrator-service
-- payroll-generation-request-publisher
-- sboot-security-base-auth-service
-- sboot-payroll-generation-processor
-- sboot-security-base-api-gateway
-- sboot-payroll-calculation-service
-- sboot-data-employe-serice
-- sboot-data-company-serice
-- RabbitMQ
-- Redis
-- sboot-payroll-events-service
-- sboot-payroll-validation-service
-- sboot-time-tracking-integration-service
-- **sboot-stts-base-status-generation-file** (serviço especializado em status)
+- Orquestração E2E com os componentes informados.
+- RabbitMQ como backbone de eventos.
+- Redis para persistência de status.
+- Serviço de status consumindo `payroll.generation.result` e notificando frontend via SSE.
+- Script de validação E2E sem trocar a stack dos microserviços (continua Spring Boot).
 
-## Fluxo arquitetural (Orquestração vs Geração de Resultados)
+## Componentes no Compose
 
-### 1) Orquestração
-1. `payroll-generation-request-publisher` publica em `payroll.generation.request`
-2. `boot-payroll-orchestrator-service` consome e publica em `payroll.validation.request`
-3. `sboot-payroll-validation-service` consome e publica em `payroll.events.request`
-4. `sboot-payroll-events-service` consome e publica em `payroll.time-tracking.request`
-5. `sboot-time-tracking-integration-service` consome e publica em `payroll.calculation.request`
-6. `sboot-payroll-calculation-service` consome e publica em `payroll.generation.processor.request`
-7. `sboot-payroll-generation-processor` consome e publica resultado em `payroll.generation.result`
+- `sboot-payroll-query-service`
+- `boot-payroll-orchestrator-service`
+- `payroll-generation-request-publisher`
+- `sboot-security-base-auth-service`
+- `sboot-payroll-generation-processor`
+- `sboot-security-base-api-gateway`
+- `sboot-payroll-calculation-service`
+- `sboot-data-employe-serice`
+- `sboot-data-company-serice`
+- `RabbitMQ`
+- `Redis`
+- `sboot-payroll-events-service`
+- `sboot-payroll-validation-service`
+- `sboot-time-tracking-integration-service`
+- `sboot-stts-base-status-generation-file`
 
-### 2) Geração de resultados (Status)
-8. `sboot-stts-base-status-generation-file` consome `payroll.generation.result`
-9. Atualiza o Redis com status por `correlation_id`
-10. Notifica front-end via **Server-Sent Events (SSE)** em `/events`
+> Observação: `sboot-security-base-api-gateway` apareceu duas vezes no seu pedido; no compose ele é definido uma vez.
 
-## Configuração Redis aplicada
+## Fluxo funcional esperado
+
+1. `payroll-generation-request-publisher` publica solicitação de geração.
+2. `boot-payroll-orchestrator-service` coordena pipeline.
+3. `sboot-payroll-validation-service` valida.
+4. `sboot-payroll-events-service` consolida eventos.
+5. `sboot-time-tracking-integration-service` integra apontamentos.
+6. `sboot-payroll-calculation-service` calcula folha.
+7. `sboot-payroll-generation-processor` publica em `payroll.generation.result`.
+8. `sboot-stts-base-status-generation-file` consome resultado, grava no Redis e expõe SSE.
+
+## Configuração Redis usada no status service
 
 ```yaml
 redis:
@@ -46,31 +51,29 @@ redis:
   timeout: ${REDIS_TIMEOUT:2s}
 ```
 
-No serviço de status isso é mapeado por variáveis:
-- `REDIS_HOST`
-- `REDIS_PORT`
-- `REDIS_PASSWORD`
-- `REDIS_TIMEOUT`
+## Pré-requisitos
 
-## Como subir o ambiente
+- Docker + Docker Compose
+- Imagens Docker dos microserviços Spring Boot já construídas/publicadas
 
-```bash
-docker compose up --build -d
-```
-
-## Teste End-to-End
-
-Executa o fluxo completo e valida:
-- publicação inicial;
-- processamento na cadeia;
-- escrita no Redis;
-- evento SSE emitido.
+## Subir ambiente
 
 ```bash
-python e2e/test_e2e.py
+docker compose up -d
 ```
 
-## Encerramento
+## Teste E2E
+
+O script abaixo:
+- publica uma mensagem de teste diretamente no RabbitMQ (`payroll.generation.request`),
+- aguarda o status ficar disponível no endpoint do status service,
+- valida resposta do status.
+
+```bash
+bash e2e/run-e2e.sh
+```
+
+## Encerrar
 
 ```bash
 docker compose down -v

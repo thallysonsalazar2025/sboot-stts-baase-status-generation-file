@@ -1,164 +1,151 @@
-version: '3.9'
+version: "3.9"
+
+name: payroll-e2e-java
 
 services:
   rabbitmq:
     image: rabbitmq:3.13-management
-    hostname: rabbitmq
+    container_name: rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7.2-alpine
-    hostname: redis
+    container_name: redis
     ports:
       - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   payroll-generation-request-publisher:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: publisher
-      SERVICE_NAME: payroll-generation-request-publisher
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      OUT_QUEUE: payroll.generation.request
-      CORRELATION_ID: e2e-correlation-001
+    image: ${PAYROLL_GENERATION_REQUEST_PUBLISHER_IMAGE:-payroll-generation-request-publisher:latest}
+    container_name: payroll-generation-request-publisher
+    environment: &java_common_env
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   boot-payroll-orchestrator-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: boot-payroll-orchestrator-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.generation.request
-      OUT_QUEUE: payroll.validation.request
+    image: ${BOOT_PAYROLL_ORCHESTRATOR_IMAGE:-boot-payroll-orchestrator-service:latest}
+    container_name: boot-payroll-orchestrator-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-payroll-validation-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-payroll-validation-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.validation.request
-      OUT_QUEUE: payroll.events.request
+    image: ${SBOOT_PAYROLL_VALIDATION_IMAGE:-sboot-payroll-validation-service:latest}
+    container_name: sboot-payroll-validation-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-payroll-events-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-payroll-events-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.events.request
-      OUT_QUEUE: payroll.time-tracking.request
+    image: ${SBOOT_PAYROLL_EVENTS_IMAGE:-sboot-payroll-events-service:latest}
+    container_name: sboot-payroll-events-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-time-tracking-integration-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-time-tracking-integration-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.time-tracking.request
-      OUT_QUEUE: payroll.calculation.request
+    image: ${SBOOT_TIME_TRACKING_INTEGRATION_IMAGE:-sboot-time-tracking-integration-service:latest}
+    container_name: sboot-time-tracking-integration-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-payroll-calculation-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-payroll-calculation-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.calculation.request
-      OUT_QUEUE: payroll.generation.processor.request
+    image: ${SBOOT_PAYROLL_CALCULATION_IMAGE:-sboot-payroll-calculation-service:latest}
+    container_name: sboot-payroll-calculation-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-payroll-generation-processor:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-payroll-generation-processor
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.generation.processor.request
-      OUT_QUEUE: payroll.generation.result
+    image: ${SBOOT_PAYROLL_GENERATION_PROCESSOR_IMAGE:-sboot-payroll-generation-processor:latest}
+    container_name: sboot-payroll-generation-processor
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-stts-base-status-generation-file:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: status
-      SERVICE_NAME: sboot-stts-base-status-generation-file
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.generation.result
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ""
-      REDIS_TIMEOUT: 2s
+    image: ${SBOOT_STATUS_GENERATION_IMAGE:-sboot-stts-base-status-generation-file:latest}
+    container_name: sboot-stts-base-status-generation-file
     ports:
       - "8080:8080"
+    environment:
+      <<: *java_common_env
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2s}
     depends_on:
-      - rabbitmq
-      - redis
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   sboot-security-base-api-gateway:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-security-base-api-gateway
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: gateway.auth.request
-      OUT_QUEUE: security.auth.request
+    image: ${SBOOT_SECURITY_API_GATEWAY_IMAGE:-sboot-security-base-api-gateway:latest}
+    container_name: sboot-security-base-api-gateway
+    ports:
+      - "9000:9000"
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-security-base-auth-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-security-base-auth-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: security.auth.request
-      OUT_QUEUE: payroll.query.request
+    image: ${SBOOT_SECURITY_AUTH_IMAGE:-sboot-security-base-auth-service:latest}
+    container_name: sboot-security-base-auth-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-payroll-query-service:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-payroll-query-service
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: payroll.query.request
-      OUT_QUEUE: data.employee.request
+    image: ${SBOOT_PAYROLL_QUERY_IMAGE:-sboot-payroll-query-service:latest}
+    container_name: sboot-payroll-query-service
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-data-employe-serice:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-data-employe-serice
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: data.employee.request
-      OUT_QUEUE: data.company.request
+    image: ${SBOOT_DATA_EMPLOYE_IMAGE:-sboot-data-employe-serice:latest}
+    container_name: sboot-data-employe-serice
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
   sboot-data-company-serice:
-    build: ./services/common
-    environment:
-      SERVICE_MODE: relay
-      SERVICE_NAME: sboot-data-company-serice
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      IN_QUEUE: data.company.request
-      OUT_QUEUE: gateway.response
+    image: ${SBOOT_DATA_COMPANY_IMAGE:-sboot-data-company-serice:latest}
+    container_name: sboot-data-company-serice
+    environment: *java_common_env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
