@@ -1,6 +1,4 @@
-# Ambiente E2E (Java/Spring Boot) — Status de Processamento
 
-Você está certo em se preocupar: o ambiente agora foi ajustado para **manter arquitetura Java/Spring Boot** nos serviços.
 
 ## O que este repositório entrega
 
