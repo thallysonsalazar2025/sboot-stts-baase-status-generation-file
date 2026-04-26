@@ -120,11 +120,14 @@ services:
       - "8080:8080"
     environment:
       <<: *java_common_env
+      SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/config/
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2s}
       PAYROLL_QUEUE_INPUT: payroll.generation.result
+    volumes:
+      - ./configs/status-service/application-docker.yml:/config/application-docker.yml:ro
     depends_on:
       rabbitmq:
         condition: service_healthy
